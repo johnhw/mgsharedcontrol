@@ -1,0 +1,55 @@
+## valid node types:
+## sensor_input: probabilistic input from a sensor encoder
+## fsm_input: boolean input from the finite state machine
+## inferred: inferred from the state of other nodes in the network
+## output: a query node conditioned on some evidence.  queried on the conjunction of the variables specified
+
+## negation:
+## variables can be negated by introducing a ~ in front of the name. This is valid in queries and in the parents
+## elemnt of an inferred table.
+
+shoulder_jerked: 
+    type: sensor_input
+    
+gripped:
+    type: sensor_input
+
+hand/not_grasping:
+    type: fsm_input
+        
+
+grasp?:
+    type: inferred
+    # nodes upon which we depend
+    parents: 
+        - gripped
+        - shoulder_jerked
+        - hand/not_grasping
+    # specifies the conditional truth table, in the format
+    # xxx... : p
+    # where each x must be either t or f
+    # one x per parent
+    # every combination must be fully specified    
+    p:
+        ttt : 0.9
+        ttf : 0.1
+        tft : 0.1
+        tff : 0.01
+        ftt : 0.0
+        ftf : 0.0
+        fft : 0.0
+        fff : 0.0
+        
+send_grasp:
+    type: output
+    query: 
+        - grasp?
+    event:
+        fsm: hand
+        event: grasp
+        logp: -2
+        
+    
+    
+    
+

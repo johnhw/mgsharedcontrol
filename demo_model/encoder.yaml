@@ -1,0 +1,23 @@
+    
+# ok, we have:
+# a mapping of sensors to lists of encoders
+# an encoder has:
+#       a target node name
+#       an encoder type + parameters
+#       [optional] transform
+
+    
+pressure:
+    - node:  gripped
+      type:  threshold
+      params: { threshold: 0.5 }  
+      flip: True            
+      transform: {matrix:[-1], centre:[0]}
+
+
+shoulder_acc:
+    - node:  shoulder_jerked
+      type:  threshold
+      params: { threshold: 0.5 }  
+            
+      
