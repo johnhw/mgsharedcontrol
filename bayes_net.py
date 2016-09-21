@@ -8,7 +8,10 @@ from collections import defaultdict
 import pydot
 import pprint
 import numpy as np
-import logging
+import os, sys, json
+import config, logutil
+
+logger = logutil.get_logger('BAYES')
 
 def normalise_name(n):
     if n.startswith('~'):
@@ -103,17 +106,12 @@ class BayesNet(object):
         nd = NodeData()
         nd.Vdata = self.nodes
         
-        logging.debug(pprint.pformat(nd.Vdata))
+        #logging.debug(pprint.pformat(nd.Vdata))
         
         self.net = DiscreteBayesianNetwork(og, nd)
         self.factor_net = TableCPDFactorization(self.net)
         
-            
-        
-        
     def infer(self, sensor_evidence, fsm_evidence):
-        
-        
         # sensor values are always True; their proxy nodes encode the real probability
         evidence = dict(fsm_evidence)
         evidence.update({k:"T" for k in sensor_evidence})
@@ -139,9 +137,21 @@ class BayesNet(object):
             prob = result = fn.specificquery(query, evidence)
             ev = output["event"]
             formatted_query = " AND ".join(query)
-            logging.debug("Query p(%s)=%.8f; need p(%s)>%.8f to trigger event %s/%s" % (formatted_query, prob, formatted_query, 1-np.exp(ev["logp"]), ev.get("fsm", None), ev["event"]))
+            # logging.debug("Query p(%s)=%.8f; need p(%s)>%.8f to trigger event %s/%s" % (formatted_query, prob, formatted_query, 1-np.exp(ev["logp"]), ev.get("fsm", None), ev["event"]))
+
+            logger.info(json.dumps({ \
+                'type' : 'query',
+                'query' : formatted_query,
+                'value' : '%.8f' % prob,
+                'threshold' : '%.8f' % (1-np.exp(ev['logp'])),
+                'fsm' : ev.get("fsm", None),
+                'event' : ev['event']
+            }))
+
             if prob>(1-np.exp(ev["logp"]))+self.event_caution:
-                logging.debug("Fired event %s/%s" % (ev.get("fsm", None), ev["event"]))
+                #logging.debug("Fired event %s/%s" % (ev.get("fsm", None), ev["event"]))
+                logger.info(json.dumps({'type': 'fire_event', 'fsm': ev.get("fsm", None), 'event': ev['event']}))
+
                 # generate event
                 events.append({"fsm":ev.get("fsm", None), "event":ev["event"]})
         
@@ -202,18 +212,13 @@ class BayesNet(object):
             ev = output["event"]
             outputs[name] = {"node":bel_node, "fsm":ev["fsm"], "event":ev["event"]}
         return fsm_inputs, sensor_inputs, outputs
-                
-                
-                   
-            
-            
-
     
 def load_bayes_net(yaml_file):
     with open(yaml_file) as f:
         bayes_specs = yaml.load(f)
     bn = BayesNet(bayes_specs)
     return bn
+
 if __name__=="__main__":    
     bn = load_bayes_net("demo_model/bayes_net.yaml")
-    bn.infer({}, {"not_grasping":"F"})
+    print(bn.infer({}, {"hand/not_grasping":"F"}))

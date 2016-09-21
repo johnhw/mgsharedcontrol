@@ -2,12 +2,11 @@ import yaml
 import fsm
 import bayes_net
 import sensor_encoder
-import os
+import os, sys, json
 import pydot
-import logging
-FORMAT = '%(asctime)-15s %(message)s'
-logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+import config, logutil
 
+logger = logutil.get_logger('SHARED')
 
 class SharedControl(object):
 
@@ -15,8 +14,6 @@ class SharedControl(object):
         self.fsms = fsm.load_fsms(os.path.join(model_dir, "fsms.yaml"))
         self.bayes_net = bayes_net.load_bayes_net(os.path.join(model_dir, "bayes_net.yaml"))
         self.sensor_encoder = sensor_encoder.load_sensor_encoder(os.path.join(model_dir, "encoder.yaml"))
-        
-    
         
     def update(self, sensor_dict):
         """
@@ -26,16 +23,18 @@ class SharedControl(object):
         # encode sensor values
         # get a node name->probability mapping
         sensor_probs = self.sensor_encoder.encode(sensor_dict)      
+        logger.info(json.dumps({'type': 'sensor_update', 'value': '%s' % sensor_probs}))
         
         fsm_evidence = {}
         
         # infer bayes net output variables
         events = self.bayes_net.infer(sensor_probs, fsm_evidence)
-        
+        logger.info(json.dumps({'type': 'inferred_events', 'value': '%s' % events}))
+
         # trigger messages to the FSM (will be list of (fsm_name, event_name) pairs))
         # if fsm_name is None, this is a broadcast event        
         for event in events:
-           
+            logger.info(json.dumps({'type': 'send_FSM_event', 'value': event['event'], 'fsm': event['fsm']}))
             self.fsms.send(event["fsm"], event["event"])
             
         all_events = self.fsms.get_events()
@@ -58,7 +57,6 @@ class SharedControl(object):
         
         # bayes net -> fsm
         for name,output in outputs.iteritems():
-            
             target_fsm = output["fsm"]
             output_node = output["node"]
             fsm_node = fsm_nodes[target_fsm]
@@ -80,13 +78,12 @@ class SharedControl(object):
             edge = pydot.Edge(target_node, bn_node, style="dashed")
             dot_object.add_edge(edge)
             
-            
-            
-        
+        import cPickle
+        print(len(cPickle.dumps(dot_object)))
         dot_object.write_png(fname, prog="dot")
     
-                
 if __name__=="__main__":
     s = SharedControl("demo_model")             
     s.render_graph()
-    s.update({"pressure":0.1, "shoulder_acc":251.0})
+    events = s.update({"pressure":0.5, "shoulder_acc":251.0})
+    print('Shared control events:', events)

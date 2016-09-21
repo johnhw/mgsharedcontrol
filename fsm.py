@@ -1,12 +1,20 @@
 import yaml
 import fysom
 import pydot
-import logging
+import os, sys, json
+import config, logutil
+
 # todo: mark events as "outgoing" to allow them to be captured and sent on
 
+logger = logutil.get_logger('FSM')
+
 class FSM(object):
-    def __init__(self, spec):
+    def __init__(self, name, spec):
+        """
+        Create an FSM from a collection of YAML specs
+        """
         self.event_stack = []
+        self.name = name
         initial = spec["initial"]
         events = spec["events"]        
         event_list = []
@@ -16,8 +24,10 @@ class FSM(object):
             event_list.append(ev)
         fysom_spec = {'initial':initial, 'events':event_list}
         self.fsm = fysom.Fysom(fysom_spec, trace=True)
+
+        logger.info("FSM '%s' created" % self.name)
         
-        ## attach event handlers
+        # attach event handlers
         for name, event_spec in events.iteritems():        
             if "before" in event_spec:
                 self.fsm.__dict__['onbefore%s'%name] = lambda x,y=event_spec["before"]: self.fire_event(y)
@@ -40,7 +50,7 @@ class FSM(object):
             
     def fire_event(self, ev):
         self.event_stack.append(ev)
-        logging.debug("FIRED: %s" % ev)
+        logger.info(json.dumps({'type': 'FSM_event', 'FSM': self.name, 'name': ev}))
         return True
         
     def clear_events(self):
@@ -57,31 +67,46 @@ class FSM(object):
             self.fsm.trigger(event)
             
 class MultiFSM(object):
+    """
+    Contains/manages a collection of FSM objects, indexed by name
+    """
     def __init__(self):
         self.fsms = {}
         
-        
     def add_fsm(self, name, fsm):
+        """
+        Adds a named FSM to the collection
+        """
         self.fsms[name]=fsm
         
     def broadcast(self, event):
-        # broadcast event to all sub FSMs
+        """
+        Broadcasts the given event to all FSMs
+        """
         for name,fsm in self.fsms.iteritems():            
             fsm.event(event)
             
     def send(self, fsm_name, event):
+        """
+        Send an event to a named FSM, or broadcast to all if fsm_name is None
+        """
         if fsm_name is None:
             self.broadcast(event)
         else:
-            # send an event to a specific FSM
             self.fsms[fsm_name].event(event)
             
     def get_fsm(self, name):
+        """
+        Retrieve a named FSM object
+        """
         return self.fsms[name]
         
     def get_events(self):
+        """
+        Returns a dict of all output events collected from each sub FSM
+        """
         # collect together all output events
-        all_events = []
+        all_events = {}
         for fsm_name,fsm in self.fsms.iteritems():
             all_events[fsm] = list(fsm.event_stack)
             fsm.clear_events()
@@ -89,16 +114,25 @@ class MultiFSM(object):
             
             
     def all_state(self):
+        """
+        Returns a dict indicating the current state of each FSM
+        """
         states = {}
         for name,fsm in self.fsms.iteritems():            
             states[name] = fsm.state
         return states
         
     def print_all_state(self):
+        """
+        Print the name and current state of each FSM
+        """
         for name,fsm in self.fsms.iteritems():            
             print "%s: %s" % (name, fsm.state)
             
     def add_to_graph(self, graph, draw_callbacks=False, prefix=""):
+        """
+        Adds the FSM(s) to a pydot graph
+        """
         fsms = pydot.Cluster("FSMs", label="FSMs", 
                                 fontname="helvetica",
                                 color="gray", fontcolor="gray")
@@ -165,29 +199,39 @@ class MultiFSM(object):
         
 def load_fsms(yaml_file):
     """
-    Read a series of state machines from a YAML file.
+    Read a series of state machines froma YAML file.
     The YAML file must be a dictionary of a FSM definitions.
     Returns a single MultiFSM object
     """
-    with open(yaml_file) as f:
-        fsm_specs = yaml.load(f)
+    if not os.path.exists(yaml_file):
+        print('Error: file "%s" does not exist!' % yaml_file)
+        sys.exit(-1)
+
+    try:
+        with open(yaml_file) as f:
+            fsm_specs = yaml.load(f)
+    except Exception, e:
+        print('Error loading YAML FSM definition:')
+        print('\t%s\n\t' % (e.problem, e.problem_mark))
+        sys.exit(-1)
+
     multi_fsm = MultiFSM()
 
     for name, specs in fsm_specs.iteritems():
-        multi_fsm.add_fsm(name, FSM(specs))
+        multi_fsm.add_fsm(name, FSM(name, specs))
     return multi_fsm
     
     
 if __name__=="__main__":
 
     multi_fsm = load_fsms("demo_model/fsms.yaml")
-    multi_fsm.broadcast("open_arm")
+    multi_fsm.broadcast("grasp")
+    multi_fsm.broadcast("grasp_complete")
     
     ## write out image of this fsm set
     dot_object = pydot.Dot(graph_name="main_graph",rankdir="LR", labelloc='b', 
                        labeljust='r', ranksep=1)
                        
-    
     multi_fsm.add_to_graph(dot_object)
     dot_object.write_png("fsm_demo.png", prog="dot")
     
