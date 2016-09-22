@@ -6,7 +6,7 @@ import os, sys, json
 import pydot
 import config, logutil
 
-logger = logutil.get_logger('SHARED')
+logger = logutil.get_logger('shared')
 
 class SharedControl(object):
 
@@ -41,7 +41,7 @@ class SharedControl(object):
         return list(all_events.values())
             
     def render_graph(self, fname="shared_control_map.png"):
-        dot_object = pydot.Dot(graph_name="main_graph",rankdir="LR", labelloc='b', 
+        dot_object = pydot.Dot(graph_name="main_graph",rankdir="UD", labelloc='b', 
                        labeljust='r', ranksep=1)
                        
         dot_object.set_node_defaults(shape='circle', fixedsize='false',
