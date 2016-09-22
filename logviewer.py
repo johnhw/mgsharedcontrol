@@ -150,7 +150,7 @@ class LogViewer(object):
         Formats a log record object for display in the listbox
         """
         dt = datetime.fromtimestamp(rec['created'])
-        return '[%s][%s/%s][%s.%s] %s' % (dt.strftime('%H:%M:%S'), rec['name'], rec['levelname'], rec['module'], rec['funcName'], rec['msg'])
+        return '[%s.%d][%s/%s.%s] %s' % (dt.strftime('%H:%M:%S'), dt.microsecond/1000, rec['levelname'], rec['module'], rec['funcName'], rec['msg'])
 
     def selected_message(self, event):
         """
