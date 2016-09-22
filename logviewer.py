@@ -1,10 +1,12 @@
 import sys, os
 from Tkinter import *
+from tkFileDialog import askdirectory
 import socket, cPickle, logging
 from datetime import datetime
 from threading import Thread
 from time import sleep
 from Queue import Queue, Empty
+from shared import SharedControl
 import demjson
 import config
 
@@ -66,6 +68,8 @@ class LogViewer(object):
         self.receiver = LogReceiver()
         self.messages = []
         self.filtered_messages = []
+        self.fsm_path = []
+        self.model = None
 
         self.root = Tk()
         self.root.geometry('950x500+50+50')
@@ -73,8 +77,9 @@ class LogViewer(object):
 
         # grid row/col weighting adjustments
         self.root.rowconfigure(index=1, weight=1)
-        self.root.rowconfigure(index=8, weight=1)
+        self.root.rowconfigure(index=9, weight=1)
         self.root.columnconfigure(index=0, weight=1)
+        self.root.columnconfigure(index=1, weight=1)
 
         # StringVars for the text widgets that need modified
         self.filter_message = StringVar(self.root, "")
@@ -99,18 +104,22 @@ class LogViewer(object):
         # Label for the JSON text widget
         self.jsonheader = Label(self.root, text="JSON:", bg=LogViewer.DEFAULT_BG)
 
+        self.chartbutton = Button(self.root, text="View model graph", bg=LogViewer.DEFAULT_BG, padx=6, pady=6, command=self.show_chart)
+
         # place all the widgets using the grid layout manager
 
         self.logheader.grid(row=0, column=0, sticky=W)
         self.listbox.grid(row=1, column=0, rowspan=4, columnspan=4, padx=5, pady=5, sticky=NSEW)
         self.listvscroll.grid(row=1, column=4, rowspan=4, sticky=NS)
-        self.listhscroll.grid(row=5, column=0, columnspan=4, sticky=EW)
+        self.listhscroll.grid(row=5, column=0, columnspan=8, sticky=EW)
+    
+        self.chartbutton.grid(row=6, column=2, sticky=EW)
 
         self.filter_label.grid(row=6, column=0, sticky=E)
-        self.filter.grid(row=6, column=1, sticky=W)
+        self.filter.grid(row=6, column=1, sticky=EW)
 
-        self.jsonheader.grid(row=7, column=0, sticky=W)
-        self.jsontext.grid(row=8, column=0, columnspan=4, padx=5, pady=5, sticky=NSEW)
+        self.jsonheader.grid(row=8, column=0, sticky=W)
+        self.jsontext.grid(row=9, column=0, columnspan=8, padx=5, pady=5, sticky=NSEW)
 
         # set up event handling/states
 
@@ -145,6 +154,25 @@ class LogViewer(object):
         self.receiver.stop()
         sys.exit(0)
 
+    def show_chart(self):
+        model_dir = askdirectory(initialdir=os.getcwd(), parent=self.root, title='Select model directory', mustexist=True)
+        if not model_dir:
+            return
+
+        try:
+            self.model = SharedControl(model_dir)
+            fname = os.path.basename(model_dir)+'.png'
+            self.model.render_graph(fname)
+            if hasattr(os, 'startfile'):
+                # only on Windows
+                os.startfile(fname)
+            else:
+                # for macs
+                os.system('open "%s"' % fname)
+        except Exception, e:
+            print('Failed to load model files from "%s"' % model_dir)
+            
+        
     def format_rec(self, rec):
         """
         Formats a log record object for display in the listbox
@@ -194,7 +222,7 @@ class LogViewer(object):
         """
         Returns the label text for the filter text box 
         """
-        return 'Filter messages [%d/%d]:' % (self.listbox.size(), len(self.messages))
+        return 'Filter messages [showing %d/%d]:' % (self.listbox.size(), len(self.messages))
 
     def record_matches(self, rec, filt):
         """
