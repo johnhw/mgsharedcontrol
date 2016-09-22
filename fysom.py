@@ -32,6 +32,10 @@ import weakref
 import types
 import sys
 import logging
+import json
+import logutil
+
+logger = logutil.get_logger('fysom')
 
 __author__ = 'Mansour Behabadi'
 __copyright__ = 'Copyright 2011, Mansour Behabadi and Jake Gordon'
@@ -289,6 +293,7 @@ class Fysom(object):
             setattr(e, 'args', args)
             if self.trace:
                 logging.debug("EVENT %s (%s -> %s)", e.event, e.src, e.dst)
+                logger.info(json.dumps({'type': 'transition', 'src': e.src, 'dst': e.dst, 'event': e.event}))
             # Try to trigger the before event, unless it gets canceled.
             if self._before_event(e) is False:
                 raise Canceled(

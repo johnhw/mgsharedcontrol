@@ -6,7 +6,7 @@ import json
 import os, sys
 import config, logutil
 
-logger = logutil.get_logger('ENCODER')
+logger = logutil.get_logger('sensors')
 
 class Encoder(object):
     def __init__(self, sub_encoder, transform=None, flip=False):

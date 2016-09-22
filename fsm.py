@@ -25,7 +25,7 @@ class FSM(object):
         fysom_spec = {'initial':initial, 'events':event_list}
         self.fsm = fysom.Fysom(fysom_spec, trace=True)
 
-        logger.info("FSM '%s' created" % self.name)
+        logger.info(json.dumps({'type': 'fsm_created', 'name': self.name}))
         
         # attach event handlers
         for name, event_spec in events.iteritems():        
@@ -50,7 +50,7 @@ class FSM(object):
             
     def fire_event(self, ev):
         self.event_stack.append(ev)
-        logger.info(json.dumps({'type': 'FSM_event', 'FSM': self.name, 'name': ev}))
+        logger.info(json.dumps({'type': 'fire_event', 'FSM': self.name, 'event': ev}))
         return True
         
     def clear_events(self):
@@ -65,6 +65,9 @@ class FSM(object):
     def event(self, event):
         if self.fsm.can(event):
             self.fsm.trigger(event)
+            return True
+
+        return False
             
 class MultiFSM(object):
     """
@@ -83,8 +86,14 @@ class MultiFSM(object):
         """
         Broadcasts the given event to all FSMs
         """
+        handled = False
         for name,fsm in self.fsms.iteritems():            
-            fsm.event(event)
+            handled = handled or fsm.event(event)
+
+        if not handled:
+            logger.warn(json.dumps({'type': 'ignored_event_broadcast', 'event': event}))
+
+        return handled
             
     def send(self, fsm_name, event):
         """
@@ -93,7 +102,8 @@ class MultiFSM(object):
         if fsm_name is None:
             self.broadcast(event)
         else:
-            self.fsms[fsm_name].event(event)
+            if not self.fsms[fsm_name].event(event):
+                logger.warn(json.dumps({'type': 'ignored_event', 'fsm': fsm_name, 'event': event}))
             
     def get_fsm(self, name):
         """
@@ -227,6 +237,8 @@ if __name__=="__main__":
     multi_fsm = load_fsms("demo_model/fsms.yaml")
     multi_fsm.broadcast("grasp")
     multi_fsm.broadcast("grasp_complete")
+    multi_fsm.broadcast("release")
+    multi_fsm.broadcast("release_complete")
     
     ## write out image of this fsm set
     dot_object = pydot.Dot(graph_name="main_graph",rankdir="LR", labelloc='b', 

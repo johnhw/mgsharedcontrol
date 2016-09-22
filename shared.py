@@ -34,7 +34,7 @@ class SharedControl(object):
         # trigger messages to the FSM (will be list of (fsm_name, event_name) pairs))
         # if fsm_name is None, this is a broadcast event        
         for event in events:
-            logger.info(json.dumps({'type': 'send_FSM_event', 'value': event['event'], 'fsm': event['fsm']}))
+            logger.info(json.dumps({'type': 'inferred_event', 'value': event['event'], 'fsm': event['fsm']}))
             self.fsms.send(event["fsm"], event["event"])
             
         all_events = self.fsms.get_events()
