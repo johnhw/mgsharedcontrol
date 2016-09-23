@@ -23,13 +23,13 @@ class SharedControl(object):
         # encode sensor values
         # get a node name->probability mapping
         sensor_probs = self.sensor_encoder.encode(sensor_dict)      
-        logger.info(json.dumps({'type': 'sensor_update', 'value': '%s' % sensor_probs}))
+        logger.info(json.dumps({'type': 'sensor_update', 'value': sensor_probs}))
         
         fsm_evidence = {}
         
         # infer bayes net output variables
         events = self.bayes_net.infer(sensor_probs, fsm_evidence)
-        logger.info(json.dumps({'type': 'inferred_events', 'value': '%s' % events}))
+        logger.info(json.dumps({'type': 'inferred_events', 'value': events}))
 
         # trigger messages to the FSM (will be list of (fsm_name, event_name) pairs))
         # if fsm_name is None, this is a broadcast event        
@@ -79,7 +79,6 @@ class SharedControl(object):
             dot_object.add_edge(edge)
             
         import cPickle
-        print(len(cPickle.dumps(dot_object)))
         dot_object.write_png(fname, prog="dot")
     
 if __name__=="__main__":
