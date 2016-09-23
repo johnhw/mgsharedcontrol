@@ -7,7 +7,7 @@ from threading import Thread
 from time import sleep
 from Queue import Queue, Empty
 from shared import SharedControl
-import demjson
+import demjson, json
 import config
 
 class LogReceiver(Thread):
@@ -203,15 +203,9 @@ class LogViewer(object):
             try:
                 # decode the JSON content (demjson is less strict than the json module)
                 msg = demjson.decode(val[val.find("{"):])
-
-                # do some (very) basic pretty printing
-                pp = '{\n'
-                keys = msg.keys()
-                keys.sort()
-                for k in keys:
-                    pp += '    %s : "%s",\n' % (k, msg[k])
-                pp = pp[:-2] + '\n}'
-                self.jsontext.insert('0.0', pp)
+                # now use the stdlib JSON module to pretty print the content
+                msgjson = json.dumps(msg, sort_keys=True, indent=4)
+                self.jsontext.insert('0.0', msgjson)
             except Exception, e:
                 self.jsontext.insert('0.0', 'Not JSON/error parsing content %s' % e)
 
